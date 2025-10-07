@@ -42,6 +42,25 @@ func addGitHubHeaders(req *http.Request) {
 	req.Header.Add("User-Agent", "nicholasss-github-activity-cli")
 }
 
+// checkResponseStatus will only return an error if there is a non-OK status
+func checkResponseStatus(status int) error {
+	if status >= 200 && status <= 299 {
+		return nil
+	}
+	// status is not-OK, but what is it specifically?
+	if status >= 100 && status <= 199 {
+		return fmt.Errorf("information still processing.. no response? %s", http.StatusText(status))
+	} else if status >= 300 && status <= 399 {
+		return fmt.Errorf("performing redirect.. %s", http.StatusText(status))
+	} else if status >= 400 && status <= 499 {
+		return fmt.Errorf("client error.. %s", http.StatusText(status))
+	} else if status >= 500 && status <= 599 {
+		return fmt.Errorf("server error.. %s", http.StatusText(status))
+	}
+
+	return fmt.Errorf("http error of %s", http.StatusText(status))
+}
+
 // === Exported Functions === //
 
 // FetchUserEvents will perform the request, format the response, and print the list of activity
@@ -69,8 +88,11 @@ func FetchUserEvents(username string) ([]data.GithubEvent, error) {
 	}
 	defer res.Body.Close()
 
-	// TODO: check the status of the response
-	// e.g. 4XX, 5XX, etc.
+	// check the error
+	err = checkResponseStatus(res.StatusCode)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO: eventually add checking for rate limit headers
 	// e.g. `x-ratelimit-limit`, `x-ratelimit-reset`

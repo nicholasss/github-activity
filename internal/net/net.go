@@ -3,6 +3,8 @@ package net
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -28,7 +30,8 @@ func buildGetUserEventsURL(username string) (*url.URL, error) {
 
 	// should make the following username
 	// "https://api.github.com/users/nicholasss/events"
-	URL.JoinPath("users", username, "events")
+	URL = URL.JoinPath("users", username, "events")
+	fmt.Printf("DEBUG: url is %q\n", URL.String())
 	return URL, nil
 }
 

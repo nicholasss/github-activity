@@ -1,7 +1,10 @@
 // Package data provides data models for the rest of the program
 package data
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type GithubEvent struct {
 	ID    string `json:"id"`
@@ -28,4 +31,5 @@ type GithubEvent struct {
 		URL        string `json:"url"`
 		AvatarURL  string `json:"avatar_url"`
 	} `json:"org"`
+	Payload json.RawMessage `json:"payload"`
 }

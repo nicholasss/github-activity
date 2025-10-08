@@ -102,27 +102,21 @@ func PrintEvents(events []data.GithubEvent) error {
 		// fmt.Printf("DEBUG: looking at %q in %q\n", eventType, eventRepo)
 		// fmt.Printf("DEBUG: previous was %q in %q\n", previousEventType, previousEventRepo)
 
-		// is the current the same as the previous? just modify the previous
+		// Is this the first event? then just append and continue
 		if previousEventType == "" || previousEventRepo == "" {
 			eventFormatStrs = append(eventFormatStrs, singleEventFormatStrings[eventType])
 			eventRepos = append(eventRepos, eventRepo)
 			eventCounts = append(eventCounts, 1)
 
+			// Is this event type and repo is the same as the previous? then check the number of occurances
 		} else if eventType == previousEventType && eventRepo == previousEventRepo {
-			// this event type and repo is the same as the previous
-			//
 			// first check if the count is 1 or 2.
-			//    if its 1 then replace the summary string **and** increment the last element
-			//    if its 2 then only increment the last element
-			//
-			// either way, the name of the repo does not change
-
 			currentEventCount := eventCounts[len(eventCounts)-1]
 			if currentEventCount <= 1 {
-				// replace the last string with the new string and increment
+				// if its 1 then replace the summary string **and** increment the last element
 				eventFormatStrs[len(eventFormatStrs)-1] = multiEventFormatStrings[eventType]
 			}
-			// number is always incremented since its the same as the last event & repo
+			// if its 2 or more then only increment the last element
 			eventCounts[len(eventCounts)-1] += 1
 
 		} else {

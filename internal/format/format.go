@@ -7,6 +7,15 @@ import (
 	"github.com/nicholasss/github-activity/internal/data"
 )
 
+// === Types === //
+
+type FormatEvent struct {
+	EventType           string
+	Count               int
+	Repo                string
+	CreateEventModifier string
+}
+
 // === Constants === //
 //
 // empty
@@ -38,7 +47,7 @@ var singleEventFormatStrings map[string]string = map[string]string{
 // the number will always be first, then the repo name
 var multiEventFormatStrings map[string]string = map[string]string{
 	"CommitCommentEvent":            " - NO FORMAT STRING YET\n",
-	"CreateEvent":                   " - Created %s in %s\n",
+	"CreateEvent":                   " - Created %d %s's in %s\n",
 	"DeleteEvent":                   " - NO FORMAT STRING YET\n",
 	"ForkEvent":                     " - NO FORMAT STRING YET\n",
 	"GollumEvent":                   " - NO FORMAT STRING YET\n",
@@ -57,103 +66,87 @@ var multiEventFormatStrings map[string]string = map[string]string{
 }
 
 // === Intermodule Functions === //
-//
-// empty
+
+func parseIntoFormatEvents(events []data.GithubEvent) []FormatEvent {
+	previousEventType := ""
+	previousRepo := ""
+	previousCreateEventModifier := ""
+
+	// list of new format events being created
+	formatEvents := make([]FormatEvent, 0)
+
+	for _, event := range events {
+		// first bring over information into variables
+		eventType := event.Type
+		repo := event.Repo.Name
+		createEventModifier := event.CreateEventType // should be "" when its not create event
+		newFormatEvent := FormatEvent{}
+
+		if previousEventType == eventType && previousRepo == repo && eventType != "CreateEvent" {
+			// first check previous event before creating a new one, and current is not "CreateEvent"
+			formatEvents[len(formatEvents)-1].Count += 1
+		} else if eventType == "CreateEvent" && createEventModifier == previousCreateEventModifier {
+			// then check for create events that are the same as the previous
+			formatEvents[len(formatEvents)-1].Count += 1
+		} else {
+			// create new format event
+			newFormatEvent.Count = 1
+			newFormatEvent.EventType = eventType
+			newFormatEvent.Repo = repo
+			newFormatEvent.CreateEventModifier = createEventModifier // again should be "" when its not create event
+
+			formatEvents = append(formatEvents, newFormatEvent)
+		}
+
+		// end of loop
+		previousEventType = eventType
+		previousRepo = repo
+		previousCreateEventModifier = createEventModifier
+	}
+
+	return formatEvents
+}
+
+func printFormatEvents(events []FormatEvent) {
+	for _, event := range events {
+		if event.Count <= 1 {
+			// single event
+			formatStr := singleEventFormatStrings[event.EventType]
+
+			if event.EventType == "CreateEvent" {
+				fmt.Printf(formatStr, event.CreateEventModifier, event.Repo)
+			} else {
+				fmt.Printf(formatStr, event.Repo)
+			}
+		} else {
+			// multiple count event
+			formatStr := multiEventFormatStrings[event.EventType]
+
+			if event.EventType == "CreateEvent" {
+				fmt.Printf(formatStr, event.Count, event.CreateEventModifier, event.Repo)
+			} else {
+				fmt.Printf(formatStr, event.Count, event.Repo)
+			}
+		}
+	}
+}
 
 // === Exported Functions === //
 
 // PrintEvents prints out the events as a formatted list
 func PrintEvents(events []data.GithubEvent) error {
-	// switch statment for each event to print the relevant information
-	//
-	// how to combine multiple types in a row into a single one with a number?
-	//   - Maybe if the repo & event.type is the same for the next one, we can combine and use new format?
-	//
-	// actually print out the strings
-
-	// first loop through the event types and append them to a new list
-	// eventTypes := make([]string, 0)
-	// for _, event := range events {
-	// 	eventTypes = append(eventTypes, event.Type)
-	// }
-
-	// we want to count how many of event there are in a row of the same type and repo
-	// so that we can aggregate them into one line
-	// e.g. "3 pushes were made to user/repo"
-	//
-	// eventSummary will have the latest event string
-	// eventNumbers will have how many of the event occured
-	// The length of the array should match
-
 	if len(events) == 0 {
 		return fmt.Errorf("unable to format empty list of events")
 	}
+	// fmt.Printf("DEBUG: Original events:\n")
+	// for _, event := range events {
+	// 	if event.Type == "CreateEvent" {
+	// 		fmt.Printf("DEBUG: - %v - %v - %v\n", event.Type, event.CreateEventType, event.Repo.Name)
+	// 	}
+	// 	fmt.Printf("DEBUG: - %v - %v\n", event.Type, event.Repo.Name)
+	// }
 
-	eventFormatStrs := make([]string, 0)
-	eventRepos := make([]string, 0)
-	eventCounts := make([]int, 0)
-
-	previousEventType := ""
-	previousEventRepo := ""
-	for _, event := range events {
-		eventType := event.Type
-		eventRepo := event.Repo.Name
-
-		// fmt.Printf("DEBUG: looking at %q in %q\n", eventType, eventRepo)
-		// fmt.Printf("DEBUG: previous was %q in %q\n", previousEventType, previousEventRepo)
-
-		// Is this the first event? then just append and continue
-		if previousEventType == "" || previousEventRepo == "" {
-			eventFormatStrs = append(eventFormatStrs, singleEventFormatStrings[eventType])
-			eventRepos = append(eventRepos, eventRepo)
-			eventCounts = append(eventCounts, 1)
-
-			// Is this event type and repo is the same as the previous? then check the number of occurances
-		} else if eventType == previousEventType && eventRepo == previousEventRepo {
-			// first check if the count is 1 or 2.
-			currentEventCount := eventCounts[len(eventCounts)-1]
-			if currentEventCount <= 1 {
-				// if its 1 then replace the summary string **and** increment the last element
-				eventFormatStrs[len(eventFormatStrs)-1] = multiEventFormatStrings[eventType]
-			}
-			// if its 2 or more then only increment the last element
-			eventCounts[len(eventCounts)-1] += 1
-
-		} else {
-			// event & repo were not the same as the last event & repo
-			//
-			// new format string for eventSummary
-			// new repo name for eventRepos
-			// new count for eventNumbers
-
-			eventFormatStrs = append(eventFormatStrs, singleEventFormatStrings[eventType])
-			eventRepos = append(eventRepos, eventRepo)
-			eventCounts = append(eventCounts, 1)
-		}
-
-		// setup for next loop
-		previousEventType = eventType
-		previousEventRepo = eventRepo
-	}
-
-	// debug checking
-	if len(eventCounts) == len(eventRepos) && len(eventRepos) == len(eventFormatStrs) && len(eventCounts) != 0 {
-		// fmt.Printf("DEBUG: all event lists are the same length\n")
-	} else {
-		fmt.Printf("DEBUG: count problem!\n - summary: %d, repos: %d, numbers: %d\n", len(eventFormatStrs), len(eventRepos), len(eventCounts))
-	}
-
-	// printing out the format strings:
-	for i, eventFormatStr := range eventFormatStrs {
-		eventRepo := eventRepos[i]
-		eventCount := eventCounts[i]
-
-		if eventCount == 1 {
-			fmt.Printf(eventFormatStr, eventRepo)
-		} else {
-			fmt.Printf(eventFormatStr, eventCount, eventRepo)
-		}
-	}
-
+	formatEvents := parseIntoFormatEvents(events)
+	printFormatEvents(formatEvents)
 	return nil
 }

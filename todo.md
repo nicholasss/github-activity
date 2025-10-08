@@ -12,3 +12,9 @@ Some events require additional information, such as "CreateEvent" and "DeleteEve
 
 Can I get away with only one additional modifier?
 Or should I create a whole new slew of custom event types that go further: "CreateRepoEvent", "DeleteBranchEvent", and they have their types that contain needed information. I could write an interface of `Event` that they conform to, in which they each put together their own formatted string?
+
+## Performing Requests
+
+### Cache x-ratelimit-reset Reset
+
+Save the time that the rate limit is reset locally in order to respect the rate limit, utilize the `retry-after` header as well.

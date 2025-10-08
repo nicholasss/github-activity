@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
+	"time"
 
 	"github.com/nicholasss/github-activity/internal/data"
 )
@@ -59,6 +61,45 @@ func checkResponseStatus(status int) error {
 	return fmt.Errorf("http error of %s", http.StatusText(status))
 }
 
+func checkHeaders(headers http.Header) ([]string, error) {
+	returnStrings := make([]string, 0)
+
+	// x-ratelimit-limit, duplicate information of below
+	// x-ratelimit-used, ignored for now
+	// x-ratelimit-resource, ignore for now
+	//
+	// x-ratelimit-remaining
+	reaminingStr := headers.Get("x-ratelimit-remaining")
+	remainingInt, err := strconv.Atoi(reaminingStr)
+	if err != nil {
+		return nil, err
+	}
+
+	if remainingInt <= 10 {
+		remainingWarning := fmt.Sprintf("You have only %d requests remaining!", remainingInt)
+		returnStrings = append(returnStrings, remainingWarning)
+	} else if remainingInt <= 0 {
+		returnStrings = append(returnStrings, "You have reached your rate limit!")
+	} else {
+		remainingWarning := fmt.Sprintf("You have %d requests remaining until it resets.", remainingInt)
+		returnStrings = append(returnStrings, remainingWarning)
+	}
+
+	// x-ratelimit-reset (in UTC epoch seconds)
+	resetStr := headers.Get("x-ratelimit-reset")
+	resetInt64, err := strconv.ParseInt(resetStr, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	resetTime := time.Unix(resetInt64, 0)
+
+	resetWarning := fmt.Sprintf("Ratelimit will reset at %s", resetTime.String())
+	returnStrings = append(returnStrings, resetWarning)
+
+	return returnStrings, nil
+}
+
 // === Exported Functions === //
 
 // FetchUserEvents will perform the request, format the response, and print the list of activity
@@ -92,13 +133,22 @@ func FetchUserEvents(username string) ([]data.GithubEvent, error) {
 		return nil, err
 	}
 
-	// TODO: eventually add checking for rate limit headers
-	// e.g. `x-ratelimit-limit`, `x-ratelimit-reset`
-
 	events, err := data.Decode(&res.Body)
 	if err != nil {
 		return nil, err
 	}
+
+	// after successful decoding of the body, print the header information
+	warningStrings, err := checkHeaders(res.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Ratelimit:\n")
+	for _, warning := range warningStrings {
+		fmt.Printf(" ** %s\n", warning)
+	}
+	fmt.Printf("\n")
 
 	// return events to be formatted elsewhere
 	return events, nil

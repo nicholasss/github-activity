@@ -2,7 +2,6 @@
 package net
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -96,9 +95,7 @@ func FetchUserEvents(username string) ([]data.GithubEvent, error) {
 	// TODO: eventually add checking for rate limit headers
 	// e.g. `x-ratelimit-limit`, `x-ratelimit-reset`
 
-	// parsing response
-	var events []data.GithubEvent
-	err = json.NewDecoder(res.Body).Decode(&events)
+	events, err := data.Decode(&res.Body)
 	if err != nil {
 		return nil, err
 	}

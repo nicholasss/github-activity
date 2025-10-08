@@ -22,6 +22,8 @@ type FormatEvent struct {
 
 // === Variables === //
 
+// TODO: update many to inspect sub-type of activity, similar to CreateEvent type
+
 // singleEventFormatStrings maps the event type to a premade single event format string
 var singleEventFormatStrings map[string]string = map[string]string{
 	"CommitCommentEvent":            " - Commit comment in %s\n",

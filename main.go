@@ -15,7 +15,7 @@ func userCommand(ctx context.Context, cmd *cli.Command) error {
 	username := cmd.StringArg("username")
 
 	// get the events from net module
-	fmt.Println("DEBUG: looking at user:", username)
+	// fmt.Println("DEBUG: looking at user:", username)
 	userEvents, err := net.FetchUserEvents(username)
 	if err != nil {
 		fmt.Printf("We ran into an error!\nError: %q\n", err)

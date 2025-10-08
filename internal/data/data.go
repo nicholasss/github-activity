@@ -3,6 +3,7 @@ package data
 
 import (
 	"encoding/json"
+	"io"
 	"time"
 )
 
@@ -31,5 +32,37 @@ type GithubEvent struct {
 		URL        string `json:"url"`
 		AvatarURL  string `json:"avatar_url"`
 	} `json:"org"`
-	Payload json.RawMessage `json:"payload"`
+	Payload         json.RawMessage `json:"payload"`
+	CreateEventType string
+}
+
+// CreateEventPayload is for the specific 'createEvent'
+type CreateEventPayload struct {
+	RefType string `json:"ref_type"`
+}
+
+func Decode(responseBody *io.ReadCloser) ([]GithubEvent, error) {
+	var events []GithubEvent
+	err := json.NewDecoder(*responseBody).Decode(&events)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, event := range events {
+		switch event.Type {
+		case "CreateEvent":
+			var createEventPayload CreateEventPayload
+			err := json.Unmarshal(event.Payload, &createEventPayload)
+			if err != nil {
+				return nil, err
+			}
+			// write decoded event direct to the original payload
+			events[i].CreateEventType = createEventPayload.RefType
+
+		default:
+			continue
+		}
+	}
+
+	return events, nil
 }

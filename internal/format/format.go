@@ -10,10 +10,11 @@ import (
 // === Types === //
 
 type FormatEvent struct {
-	EventType           string
-	Count               int
-	Repo                string
-	CreateEventModifier string
+	EventType      string
+	Count          int
+	Repo           string
+	CreateEventRef string
+	DeleteEventRef string
 }
 
 // === Constants === //
@@ -28,7 +29,7 @@ type FormatEvent struct {
 var singleEventFormatStrings map[string]string = map[string]string{
 	"CommitCommentEvent":            " - Commit comment in %s\n",
 	"CreateEvent":                   " - Created %s in %s\n",
-	"DeleteEvent":                   " - Deleted branch/tag in %s\n",
+	"DeleteEvent":                   " - Deleted %s in %s\n",
 	"ForkEvent":                     " - Forked repo to %s\n",
 	"GollumEvent":                   " - Created or updated wiki page in %s\n",
 	"IssueCommentEvent":             " - Commented in %s\n",
@@ -50,7 +51,7 @@ var singleEventFormatStrings map[string]string = map[string]string{
 var multiEventFormatStrings map[string]string = map[string]string{
 	"CommitCommentEvent":            " - %d commit comments in %s\n",
 	"CreateEvent":                   " - Created %d %s's in %s\n",
-	"DeleteEvent":                   " - Deleted %d branches/tags in %s\n",
+	"DeleteEvent":                   " - Deleted %d %s's in %s\n",
 	"ForkEvent":                     " - Forked %d repos to %s\n",
 	"GollumEvent":                   " - Created or updated %d wiki pages in %s\n",
 	"IssueCommentEvent":             " - Commented %d times in %s\n",
@@ -72,7 +73,6 @@ var multiEventFormatStrings map[string]string = map[string]string{
 func parseIntoFormatEvents(events []data.GithubEvent) []FormatEvent {
 	previousEventType := ""
 	previousRepo := ""
-	previousCreateEventModifier := ""
 
 	// list of new format events being created
 	formatEvents := make([]FormatEvent, 0)
@@ -81,21 +81,22 @@ func parseIntoFormatEvents(events []data.GithubEvent) []FormatEvent {
 		// first bring over information into variables
 		eventType := event.Type
 		repo := event.Repo.Name
-		createEventModifier := event.CreateEventType // should be "" when its not create event
+
+		// event to be modified and added
 		newFormatEvent := FormatEvent{}
 
-		if previousEventType == eventType && previousRepo == repo && eventType != "CreateEvent" {
-			// first check previous event before creating a new one, and current is not "CreateEvent"
-			formatEvents[len(formatEvents)-1].Count += 1
-		} else if eventType == "CreateEvent" && createEventModifier == previousCreateEventModifier {
-			// then check for create events that are the same as the previous
+		if previousEventType == eventType && previousRepo == repo && eventType != "CreateEvent" && eventType != "DeleteEvent" {
+			// first check previous event before creating a new one, and current is not a event with ref
 			formatEvents[len(formatEvents)-1].Count += 1
 		} else {
 			// create new format event
 			newFormatEvent.Count = 1
 			newFormatEvent.EventType = eventType
 			newFormatEvent.Repo = repo
-			newFormatEvent.CreateEventModifier = createEventModifier // again should be "" when its not create event
+
+			// event type specific references
+			newFormatEvent.CreateEventRef = event.CreateEventRef
+			newFormatEvent.DeleteEventRef = event.DeleteEventRef
 
 			formatEvents = append(formatEvents, newFormatEvent)
 		}
@@ -103,7 +104,7 @@ func parseIntoFormatEvents(events []data.GithubEvent) []FormatEvent {
 		// end of loop
 		previousEventType = eventType
 		previousRepo = repo
-		previousCreateEventModifier = createEventModifier
+		// previousCreateEventRef = createEventRef
 	}
 
 	return formatEvents
@@ -115,20 +116,21 @@ func printFormatEvents(events []FormatEvent) {
 			// single event
 			formatStr := singleEventFormatStrings[event.EventType]
 
-			if event.EventType == "CreateEvent" {
-				fmt.Printf(formatStr, event.CreateEventModifier, event.Repo)
-			} else {
+			switch event.EventType {
+			case "CreateEvent":
+				fmt.Printf(formatStr, event.CreateEventRef, event.Repo)
+
+			case "DeleteEvent":
+				fmt.Printf(formatStr, event.DeleteEventRef, event.Repo)
+
+			default:
 				fmt.Printf(formatStr, event.Repo)
 			}
 		} else {
 			// multiple count event
 			formatStr := multiEventFormatStrings[event.EventType]
 
-			if event.EventType == "CreateEvent" {
-				fmt.Printf(formatStr, event.Count, event.CreateEventModifier, event.Repo)
-			} else {
-				fmt.Printf(formatStr, event.Count, event.Repo)
-			}
+			fmt.Printf(formatStr, event.Count, event.Repo)
 		}
 	}
 }

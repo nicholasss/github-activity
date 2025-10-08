@@ -32,12 +32,16 @@ type GithubEvent struct {
 		URL        string `json:"url"`
 		AvatarURL  string `json:"avatar_url"`
 	} `json:"org"`
-	Payload         json.RawMessage `json:"payload"`
-	CreateEventType string
+	Payload        json.RawMessage `json:"payload"`
+	CreateEventRef string
+	DeleteEventRef string
 }
 
-// CreateEventPayload is for the specific 'createEvent'
 type CreateEventPayload struct {
+	RefType string `json:"ref_type"`
+}
+
+type DeleteEventPayload struct {
 	RefType string `json:"ref_type"`
 }
 
@@ -52,12 +56,21 @@ func Decode(responseBody *io.ReadCloser) ([]GithubEvent, error) {
 		switch event.Type {
 		case "CreateEvent":
 			var createEventPayload CreateEventPayload
-			err := json.Unmarshal(event.Payload, &createEventPayload)
+			err = json.Unmarshal(event.Payload, &createEventPayload)
 			if err != nil {
 				return nil, err
 			}
 			// write decoded event direct to the original payload
-			events[i].CreateEventType = createEventPayload.RefType
+			events[i].CreateEventRef = createEventPayload.RefType
+
+		case "DeleteEvent":
+			var deleteEventPayload DeleteEventPayload
+			err = json.Unmarshal(event.Payload, &deleteEventPayload)
+			if err != nil {
+				return nil, err
+			}
+			// write decoded modifier directly to original payload
+			events[i].DeleteEventRef = deleteEventPayload.RefType
 
 		default:
 			continue
